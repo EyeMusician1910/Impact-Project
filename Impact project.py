@@ -1,25 +1,19 @@
 import heapq
+import tkinter as tk
+from tkinter import ttk
+import time
 
 def visualize_path(path, distances):
     """
     Visualizes the shortest path between stations.
-
-    Args:
-        path: A list of stations representing the shortest path.
-        distances: A dictionary of distances from the start station to each station.
-
-    Returns:
-        A string representing the visualized path.
     """
-
     if len(path) == 1:
-        return f"{path[0]}"  # Just return the station name if there's only one
+        return f"{path[0]}"
 
     visualized_path = f"{path[0]}"
     for i in range(1, len(path)):
         prev_station = path[i - 1]
         current_station = path[i]
-        # Fetch the distance between the previous and current station
         distance = distances[current_station] - distances[prev_station]
         visualized_path += f" → ({distance}) → {current_station}"
 
@@ -35,11 +29,10 @@ class Graph:
         if v not in self.graph:
             self.graph[v] = []
         self.graph[u].append((v, weight))
-        self.graph[v].append((u, weight))  # Assuming undirected graph
+        self.graph[v].append((u, weight))
 
     def dijkstra(self, start, end):
-        # Min-heap priority queue
-        min_heap = [(0, start)]  # (distance, station)
+        min_heap = [(0, start)]
         distances = {station: float('inf') for station in self.graph}
         distances[start] = 0
         previous = {station: None for station in self.graph}
@@ -72,43 +65,133 @@ class Graph:
 # Create the graph
 graph = Graph()
 
-# Input
-num_stations = int(input("Enter the number of stations: "))
-stations = []
-print("Enter the names of the stations:")
-for _ in range(num_stations):
-    station_name = input(f"Station {_ + 1}: ")
-    stations.append(station_name)
+# GUI Setup
+window = tk.Tk()
+window.title("Shortest Path Finder")
+window.geometry("900x700")
+window.configure(bg="#eaf2f8")
 
-for station in stations:
-    print(f"\nEnter the routes from '{station}':")
-    num_routes = input("How many routes are available (or type 'none' if none): ").strip().lower()
+# Style configuration
+style = ttk.Style()
+style.configure("TButton", font=("Arial", 12), padding=10)
+style.configure("TLabel", background="#eaf2f8", font=("Arial", 12))
 
-    if num_routes == "none":
-        continue
+# Input Frame
+input_frame = ttk.Frame(window, padding=20)
+input_frame.pack(fill="x", padx=20, pady=10)
+
+stations_label = ttk.Label(input_frame, text="Enter station names (comma-separated):", font=("Arial", 14))
+stations_label.pack(anchor="w")
+stations_entry = ttk.Entry(input_frame, font=("Arial", 12), width=60)  # Removed unsupported options
+stations_entry.insert(0, "e.g., Station1, Station2, Station3")
+stations_entry.pack(fill="x", pady=5)
+
+routes_frame = ttk.Frame(window, padding=20)
+routes_frame.pack(fill="x", padx=20, pady=10)
+
+routes_label = ttk.Label(routes_frame, text="Enter routes (Station1, Station2, Distance):", font=("Arial", 14))
+routes_label.pack(anchor="w")
+routes_text = tk.Text(routes_frame, font=("Arial", 12), height=8, width=70, relief="solid", bg="#ffffff")
+routes_text.insert("1.0", "e.g., Station1, Station2, 10\nStation2, Station3, 15")
+routes_text.pack(fill="x", pady=5)
+
+path_frame = ttk.Frame(window, padding=20)
+path_frame.pack(fill="x", padx=20, pady=10)
+
+start_label = ttk.Label(path_frame, text="Start Station:", font=("Arial", 12))
+start_label.grid(row=0, column=0, sticky="e", padx=5)
+start_entry = ttk.Entry(path_frame, font=("Arial", 12), width=20)  # Removed unsupported options
+start_entry.grid(row=0, column=1, padx=5)
+
+end_label = ttk.Label(path_frame, text="End Station:", font=("Arial", 12))
+end_label.grid(row=0, column=2, sticky="e", padx=5)
+end_entry = ttk.Entry(path_frame, font=("Arial", 12), width=20)  # Removed unsupported options
+end_entry.grid(row=0, column=3, padx=5)
+
+# Output Frame
+output_frame = ttk.Frame(window, padding=20)
+output_frame.pack(fill="x", padx=20, pady=10)
+
+output_label = ttk.Label(output_frame, text="", font=("Arial", 14), wraplength=800, background="#d5f5e3")
+output_label.pack(fill="x", pady=5)
+
+loading_label = ttk.Label(output_frame, text="", font=("Arial", 14), foreground="#999", background="#eaf2f8")
+
+def animate_loader():
+    """
+    Animates a loader with dots.
+    """
+    dots = ["", ".", "..", "..."]
+    for i in range(len(dots)):
+        loading_label.config(text=f"Calculating shortest path{dots[i]}")
+        loading_label.update()
+        time.sleep(0.4)
+
+def animated_output(text):
+    """
+    Animates the display of the output text.
+    """
+    output_label.config(text="")
+    for i in range(len(text)):
+        output_label.config(text=text[:i + 1])
+        output_label.update()
+        time.sleep(0.03)
+
+def find_path():
+    """
+    Finds the shortest path between the start and end stations.
+    """
+    # Parse stations
+    stations = [s.strip() for s in stations_entry.get().split(",") if s.strip()]
+    if not stations:
+        output_label.config(text="Please enter station names.")
+        return
+
+    # Parse routes
+    graph.graph.clear()
+    routes = routes_text.get("1.0", "end").strip().split("\n")
+    for route in routes:
+        try:
+            station1, station2, distance = route.split(",")
+            station1 = station1.strip()
+            station2 = station2.strip()
+            distance = int(distance.strip())
+            if station1 in stations and station2 in stations:
+                graph.add_edge(station1, station2, distance)
+            else:
+                output_label.config(text=f"Invalid station in route: {route}")
+                return
+        except ValueError:
+            output_label.config(text=f"Invalid route format: {route}")
+            return
+
+    # Parse start and end stations
+    start_station = start_entry.get().strip()
+    end_station = end_entry.get().strip()
+
+    if start_station not in stations or end_station not in stations:
+        output_label.config(text="Start or end station is invalid.")
+        return
+
+    # Show loading animation
+    loading_label.pack()
+    animate_loader()
+    loading_label.pack_forget()
+
+    # Calculate shortest path
+    try:
+        distance, path, distances = graph.dijkstra(start_station, end_station)
+    except KeyError:
+        output_label.config(text="Invalid start or end station.")
+        return
+
+    # Display result
+    if distance == float('inf'):
+        animated_output(f"No path exists between {start_station} and {end_station}.")
     else:
-        num_routes = int(num_routes)
+        animated_output(f"Shortest Path: {visualize_path(path, distances)}\nTotal Distance: {distance}")
 
-    for _ in range(num_routes):
-        while True:
-            try:
-                destination = input("Enter destination station: ").strip()
-                distance = int(input("Enter distance to the destination: ").strip())
-                graph.add_edge(station, destination, distance)
-                break
-            except ValueError:
-                print("Invalid input. Please ensure the distance is a number.")
+find_path_button = ttk.Button(window, text="Find Shortest Path", command=find_path, style="TButton")
+find_path_button.pack(pady=20)
 
-# Input start and end stations
-start_station = input("\nEnter the start station: ")
-end_station = input("Enter the end station: ")
-
-# Get the shortest route
-distance, path, distances = graph.dijkstra(start_station, end_station)
-
-# Visualize and print the shortest path
-if distance == float('inf'):
-    print(f"\nNo path exists between {start_station} and {end_station}.")
-else:
-    print(f"\nShortest Path: {visualize_path(path, distances)}")
-    print(f"Total Distance: {distance}")
+window.mainloop()
